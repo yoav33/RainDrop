@@ -1,6 +1,8 @@
 # ygCloud RainDrop: Individual listener
 import socket
 import os
+import subprocess
+import configparser
 import time
 from context_menu import menus
 
@@ -15,7 +17,6 @@ def listenloop(sock):
 
 def main(sock):
     # self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    sock.bind(("0.0.0.0", int(PORT)))
     print('waiting for client connection...')
     sock.listen(1)
     print(f"listening on: {HOST}:{PORT}")
@@ -73,15 +74,100 @@ def recvFile(sock, conn):
             bytes_read = conn.recv(int(size))
             print(f"writing to '{basename}', hang on...")
             if not bytes_read:
+                print("socket has been closed by sender")
                 print("----------------------------------")
                 print(f"{basename} successfully received!")
                 print(f"file sender: {sock.getsockname()}")
                 print("sending acknowledgement.")
-                ready = "ready to receive file"
-                print("file received")
-                conn.sendall(bytes(ready, 'utf-8'))
+                cdir = os.getcwd()
+                #cdir = cdir + f"\{basename}"
+                fileRecMenu(basename, cdir)
                 os.chdir('..')
                 break
             f.write(bytes_read)
 
-main(sock)
+def fileRecMenu(file, cdir):
+    print(f"file received menu for: '{file}'")
+    print(cdir)
+    subprocess.Popen(fr'explorer "{cdir}"')
+    print("opened imports folder.")
+
+def verifyPasskey(sock, PASSKEY):
+    encReq = ksock.recv(1024)
+    Req = encReq.decode('utf-8')
+    print(f"Req={Req}")
+    if Req=="sendpasskey":
+        pk = f"passkey={PASSKEY}"
+        print(f"pk request confirmed. sending={pk}")
+        encPk= bytes(pk, 'utf-8')
+        ksock.sendall(encPk)
+        encOutcome = ksock.recv(1024)
+        outcome = encOutcome.decode('utf-8')
+        print(f"outcome={outcome}")
+        if outcome=='passkeyaccepted':
+            print("accepted! sending acknowledgement")
+            ack = bytes('approval acknowledged', 'utf-8')
+            ksock.sendall(ack)
+            encReq = ksock.recv(1024)
+            Req = encReq.decode('utf-8')
+            if Req=="sendpasskey":
+                print("error: passkey requested again. exiting..")
+                exit()
+            if Req=='sendtask':
+                print("requested to send task")
+                task = bytes('raindroplistener', 'utf-8')
+                ksock.sendall(task)
+                encReq = ksock.recv(1024)
+                Req = encReq.decode('utf-8')
+                if Req == "sendlocalip":
+                    print("requested local ip")
+                    task = bytes(f"{ip}", 'utf-8')
+                    ksock.sendall(task)
+                    encReq = ksock.recv(1024)
+                    Req = encReq.decode('utf-8')
+                    if Req == "sendport":
+                        task = bytes(f"{PORT}", 'utf-8')
+                        ksock.sendall(task)
+                        encReq = ksock.recv(1024)
+                        Req = encReq.decode('utf-8')
+                        if Req == "sendname":
+                            name = socket.gethostname()
+                            print(f"name={name}")
+                            task = bytes(name, 'utf-8')
+                            ksock.sendall(task)
+                            return None
+                #sendTask(
+                print("oopsie woopsie")
+                input("error in communications to kyrios!! press ENTER to exit.")
+                exit()
+
+        else:
+            print("rejected. exiting...")
+            exit()
+    else:
+        print("request text does not match expectations!")
+
+config = configparser.ConfigParser()
+config.read(r'raindrop.conf')
+kyrioshost = (config.get('kyrios', 'kyrioshost'))
+kyriosport = (config.get('kyrios', 'kyriosport'))
+kyriospasskey = (config.get('kyrios', 'kyriospasskey'))
+hn = socket.gethostname()
+ip = socket.gethostbyname(hn)
+sock.bind(("0.0.0.0", int(PORT)))
+print(f"local ip: {ip}")
+print(f"port: {PORT}")
+ksock = socket.socket()
+print("kyrios sock initiated")
+print(f"connecting to kyrios at {kyrioshost}:{kyriosport} with passkey {kyriospasskey}...")
+connectionSuccessful = False
+while not connectionSuccessful:
+    try:
+        ksock.connect((kyrioshost, int(kyriosport)))  # Note: if execution gets here before the server starts up, this line will cause an error, hence the try-except
+        print('socket connected')
+        connectionSuccessful = True
+    except:
+        pass
+verifyPasskey(ksock, kyriospasskey)
+while True:
+    main(sock)
