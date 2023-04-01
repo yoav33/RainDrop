@@ -174,3 +174,4 @@ while True:
         main(sock)
     except KeyboardInterrupt:
         print("kbi")
+        sock.close()
