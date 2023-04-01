@@ -131,9 +131,8 @@ def verifyPasskey(sock, PASSKEY):
                         encReq = ksock.recv(1024)
                         Req = encReq.decode('utf-8')
                         if Req == "sendname":
-                            name = socket.gethostname()
-                            print(f"name={name}")
-                            task = bytes(name, 'utf-8')
+                            print(f"name={username}")
+                            task = bytes(username, 'utf-8')
                             ksock.sendall(task)
                             return None
                 #sendTask(
@@ -149,6 +148,7 @@ def verifyPasskey(sock, PASSKEY):
 
 config = configparser.ConfigParser()
 config.read(r'raindrop.conf')
+username = (config.get('raindrop', 'username'))
 kyrioshost = (config.get('kyrios', 'kyrioshost'))
 kyriosport = (config.get('kyrios', 'kyriosport'))
 kyriospasskey = (config.get('kyrios', 'kyriospasskey'))
@@ -170,4 +170,7 @@ while not connectionSuccessful:
         pass
 verifyPasskey(ksock, kyriospasskey)
 while True:
-    main(sock)
+    try:
+        main(sock)
+    except KeyboardInterrupt:
+        print("kbi")
